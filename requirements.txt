@@ -1,5 +1,5 @@
 streamlit
-yfinance
+yahoo_fin
 google-generativeai
 python-dotenv
 ratelimit
