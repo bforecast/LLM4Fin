@@ -223,7 +223,7 @@ def rank_byLLM(industry, tickers, years=1):
                     prices[ticker] = round(get_current_price(ticker), 2)
 
                 except Exception as e:
-                    print(e)
+                    st.write(e)
             status.update(label="Analyses completed!", state="complete", expanded=False)
 
 
