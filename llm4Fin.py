@@ -66,7 +66,7 @@ def get_stock_data(ticker, years):
 
     # Retrieve financial statements
     financials = stock.financials
-    st.write(financials)
+    # st.write(financials)
     # Retrieve news articles
     news = stock.news
 
