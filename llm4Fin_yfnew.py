@@ -3,7 +3,7 @@ import google.generativeai as genai
 
 from dotenv import load_dotenv
 
-import yfinance as yf
+from yahoo_fin import stock_info, news
 from datetime import datetime, timedelta
 import requests
 from bs4 import BeautifulSoup
@@ -56,21 +56,20 @@ def get_stock_data(ticker, years):
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=years*365)
 
-    stock = yf.Ticker(ticker)
-
     # Retrieve historical price data
-    hist_data = stock.history(start=start_date, end=end_date)
+    hist_data = stock_info.get_data(ticker=ticker, start_date=start_date, end_date=end_date)
 
     # Retrieve balance sheet
-    balance_sheet = stock.balance_sheet
+    balance_sheet = stock_info.get_balance_sheet(ticker)
 
     # Retrieve financial statements
-    financials = stock.financials
-    st.write(financials)
-    # Retrieve news articles
-    news = stock.news
+    # financials = stock_info.get_financials(ticker)
+    financials = ""
 
-    return hist_data, balance_sheet, financials, news
+    # Retrieve news articles
+    news_rss = news.get_yf_rss(ticker)
+
+    return hist_data, balance_sheet, financials, news_rss
 
 
 def get_claude_comps_analysis(ticker, hist_data, balance_sheet, financials, news):
@@ -102,8 +101,8 @@ def get_sentiment_analysis(ticker, news):
     news_text = ""
     for article in news:
         article_text = get_article_text(article['link'])
-        timestamp = datetime.fromtimestamp(article['providerPublishTime']).strftime("%Y-%m-%d")
-        news_text += f"\n\n---\n\nDate: {timestamp}\nTitle: {article['title']}\nText: {article_text}"
+        # timestamp = datetime.fromtimestamp(article['providerPublishTime']).strftime("%Y-%m-%d")
+        news_text += f"\n\n---\n\nDate: {article['published_parsed']}\nTitle: {article['title']}\nText: {article_text}"
 
     messages = f"News articles for {ticker}:\n{news_text}\n\n----\n\nProvide a summary of the overall sentiment and any notable changes over time."
     response = model.generate_content(messages)
@@ -112,32 +111,30 @@ def get_sentiment_analysis(ticker, news):
 
 @cache
 def get_analyst_ratings(ticker):
-    stock = yf.Ticker(ticker)
-    recommendations = stock.upgrades_downgrades
+    # stock = Ticker(ticker)
+    # recommendations = stock.upgrades_downgrades
 
-    if recommendations is None or recommendations.empty:
-        return "No analyst ratings available."
+    # if recommendations is None or recommendations.empty:
+    #     return "No analyst ratings available."
 
-    latest_rating = recommendations.iloc[0]
+    # latest_rating = recommendations.iloc[0]
 
-    GradeDate = latest_rating.name
-    firm = latest_rating.get('Firm', 'N/A')
-    to_grade = latest_rating.get('ToGrade', 'N/A')
-    action = latest_rating.get('Action', 'N/A')
+    # GradeDate = latest_rating.name
+    # firm = latest_rating.get('Firm', 'N/A')
+    # to_grade = latest_rating.get('ToGrade', 'N/A')
+    # action = latest_rating.get('Action', 'N/A')
 
-    rating_summary = f"Latest analyst rating for {ticker}:\n Grade Date: {GradeDate}\n Firm: {firm}\n To Grade: {to_grade}\n Action: {action}"
-
-
-    return rating_summary
+    # rating_summary = f"Latest analyst rating for {ticker}:\n Grade Date: {GradeDate}\n Firm: {firm}\n To Grade: {to_grade}\n Action: {action}"
+    analysts_info = stock_info.get_analysts_info('nflx')
+    return analysts_info["Earnings Estimate"]
 
 @cache
 def get_industry_analysis(ticker):
 
     ### update to use search to find recent data!!
-
-    stock = yf.Ticker(ticker)
-    industry = stock.info['industry']
-    sector = stock.info['sector']
+    company_info = stock_info.get_company_info(ticker)
+    industry = company_info['industry']
+    sector = company_info['sector']
 
     system_prompt = f"You are an industry analysis assistant. Provide an analysis of the {industry} industry and {sector} sector, including trends, growth prospects, regulatory changes, and competitive landscape. Be measured and discerning. Truly think about the positives and negatives of the stock. Be sure of your analysis. You are a skeptical investor."
 
@@ -165,10 +162,8 @@ def generate_ticker_ideas(industry):
     return [ticker.strip() for ticker in ticker_list]
 
 
-def get_current_price(ticker):
-    stock = yf.Ticker(ticker)
-    data = stock.history(period='1d', interval='1m')
-    return data['Close'][-1]
+def get_current_price(history_price):
+    return history_price['Close'][-1]
 
 def rank_companies(industry, analyses, prices):
     system_prompt = f"You are a financial analyst providing a ranking of companies in the {industry} industry based on their investment potential. Be discerning and sharp. Truly think about whether a stock is valuable or not. You are a skeptical investor."
@@ -220,7 +215,7 @@ def rank_byLLM(industry, tickers, years=1):
                         final_analysis = get_final_analysis(ticker, {}, sentiment_analysis, analyst_ratings, industry_analysis)
                         st.write(final_analysis)
                     analyses[ticker] = final_analysis
-                    prices[ticker] = round(get_current_price(ticker), 2)
+                    prices[ticker] = round(get_current_price(hist_data), 2)
 
                 except Exception as e:
                     st.write(e)
