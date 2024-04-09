@@ -1,5 +1,5 @@
 streamlit
-yahoo_fin
+yahoo
 google-generativeai
 python-dotenv
 ratelimit
