@@ -19,7 +19,7 @@ from functools import cache
 # api_key=os.getenv("GOOGLE_API_KEY")
 api_key = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
 MINUTE = 60
 @sleep_and_retry # If there are more request to this function than rate, sleep shortly
@@ -161,14 +161,18 @@ def generate_ticker_ideas(industry):
     messages = f"Please provide a list of 5 ticker symbols for major companies in the {industry} industry as a Python-parseable list. Only respond with the list, no other text."
 
     response_text = llm_gemini(system_prompt, messages)
+    response_text = response_text.replace("python", "").strip()
+    response_text = response_text.replace("```", "").strip()
+
     ticker_list = ast.literal_eval(response_text)
+    
     return [ticker.strip() for ticker in ticker_list]
 
 
 def get_current_price(ticker):
     stock = yf.Ticker(ticker)
     data = stock.history(period='1d', interval='1m')
-    return data['Close'][-1]
+    return data['Close'].iloc[-1]
 
 def rank_companies(industry, analyses, prices):
     system_prompt = f"You are a financial analyst providing a ranking of companies in the {industry} industry based on their investment potential. Be discerning and sharp. Truly think about whether a stock is valuable or not. You are a skeptical investor."
