@@ -1,12 +1,7 @@
-import os
-import time
 import google.generativeai as genai
-
-from dotenv import load_dotenv
 
 import yfinance as yf
 from datetime import datetime, timedelta
-import requests
 from bs4 import BeautifulSoup
 import ast
 import json
@@ -14,7 +9,6 @@ from ratelimit import limits, RateLimitException, sleep_and_retry
 from backoff import on_exception, expo
 import google.api_core.exceptions as google_exceptions
 import streamlit as st
-from functools import cache
 import asyncio
 import asyncache
 from cachetools import TTLCache

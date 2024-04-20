@@ -4,3 +4,7 @@ google-generativeai
 python-dotenv
 ratelimit
 backoff
+asyncache
+aiohttp
+cachetools
+
