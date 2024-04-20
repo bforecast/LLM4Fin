@@ -4,5 +4,3 @@ google-generativeai
 python-dotenv
 ratelimit
 backoff
-
-

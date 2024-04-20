@@ -15,16 +15,29 @@ import google.api_core.exceptions as google_exceptions
 import streamlit as st
 from functools import cache
 
-# load_dotenv()
-# api_key=os.getenv("GOOGLE_API_KEY")
+# # load_dotenv()
+# # api_key=os.getenv("GOOGLE_API_KEY")
+# api_key = st.secrets["GOOGLE_API_KEY"]
+# genai.configure(api_key=api_key)
+# model = genai.GenerativeModel('gemini-1.5-pro-latest')
+
+# MINUTE = 60
+# @sleep_and_retry # If there are more request to this function than rate, sleep shortly
+# @on_exception(expo, google_exceptions.ResourceExhausted, max_tries=10) # if we receive exceptions from Google API, retry
+# @limits(calls=60, period=MINUTE)
 api_key = st.secrets["GOOGLE_API_KEY"]
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-pro-latest')
+RPM_GEMINI = {
+    "gemini-1.0-pro":   15,
+    "gemini-1.5-pro-latest":   2,
 
+}
+gemini_model = "gemini-1.0-pro"
+model = genai.GenerativeModel(gemini_model)
 MINUTE = 60
 @sleep_and_retry # If there are more request to this function than rate, sleep shortly
 @on_exception(expo, google_exceptions.ResourceExhausted, max_tries=10) # if we receive exceptions from Google API, retry
-@limits(calls=60, period=MINUTE)
+@limits(calls=RPM_GEMINI[gemini_model], period=MINUTE)
 def llm_gemini(system_prompt, messages, stshow=False):
     messages = system_prompt + "\n\n\n" + messages
     response = model.generate_content(messages)
@@ -66,7 +79,6 @@ def get_stock_data(ticker, years):
 
     # Retrieve financial statements
     financials = stock.financials
-    # st.write(financials)
     # Retrieve news articles
     news = stock.news
 
@@ -106,7 +118,6 @@ def get_sentiment_analysis(ticker, news):
         news_text += f"\n\n---\n\nDate: {timestamp}\nTitle: {article['title']}\nText: {article_text}"
 
     messages = f"News articles for {ticker}:\n{news_text}\n\n----\n\nProvide a summary of the overall sentiment and any notable changes over time."
-    response = model.generate_content(messages)
     response_text = llm_gemini(system_prompt, messages)
     return response_text
 
@@ -126,8 +137,6 @@ def get_analyst_ratings(ticker):
     action = latest_rating.get('Action', 'N/A')
 
     rating_summary = f"Latest analyst rating for {ticker}:\n Grade Date: {GradeDate}\n Firm: {firm}\n To Grade: {to_grade}\n Action: {action}"
-
-
     return rating_summary
 
 @cache
@@ -140,7 +149,6 @@ def get_industry_analysis(ticker):
     sector = stock.info['sector']
 
     system_prompt = f"You are an industry analysis assistant. Provide an analysis of the {industry} industry and {sector} sector, including trends, growth prospects, regulatory changes, and competitive landscape. Be measured and discerning. Truly think about the positives and negatives of the stock. Be sure of your analysis. You are a skeptical investor."
-
     messages = f"Provide an analysis of the {industry} industry and {sector} sector." 
 
     response_text = llm_gemini(system_prompt, messages)
@@ -149,7 +157,6 @@ def get_industry_analysis(ticker):
 
 def get_final_analysis(ticker, comparisons, sentiment_analysis, analyst_ratings, industry_analysis):
     system_prompt = f"You are a financial analyst providing a final investment recommendation for {ticker} based on the given data and analyses. Be measured and discerning. Truly think about the positives and negatives of the stock. Be sure of your analysis. You are a skeptical investor."
-
     messages = f"Ticker: {ticker}\n\nComparative Analysis:\n{json.dumps(comparisons, indent=2)}\n\nSentiment Analysis:\n{sentiment_analysis}\n\nAnalyst Ratings:\n{analyst_ratings}\n\nIndustry Analysis:\n{industry_analysis}\n\nBased on the provided data and analyses, please provide a comprehensive investment analysis and recommendation for {ticker}. Consider the company's financial strength, growth prospects, competitive position, and potential risks. Provide a clear and concise recommendation on whether to buy, hold, or sell the stock, along with supporting rationale."
     response_text = llm_gemini(system_prompt, messages)
     return response_text
@@ -157,13 +164,11 @@ def get_final_analysis(ticker, comparisons, sentiment_analysis, analyst_ratings,
 @cache
 def generate_ticker_ideas(industry):
     system_prompt = f"You are a financial analyst assistant. Generate a list of 5 ticker symbols for major companies in the {industry} industry, as a Python-parseable list."
-
     messages = f"Please provide a list of 5 ticker symbols for major companies in the {industry} industry as a Python-parseable list. Only respond with the list, no other text."
 
     response_text = llm_gemini(system_prompt, messages)
     response_text = response_text.replace("python", "").strip()
     response_text = response_text.replace("```", "").strip()
-
     ticker_list = ast.literal_eval(response_text)
     
     return [ticker.strip() for ticker in ticker_list]
@@ -184,7 +189,6 @@ def rank_companies(industry, analyses, prices):
 
     messages = f"Industry: {industry}\n\nCompany Analyses:\n{analysis_text}\n\nBased on the provided analyses, please rank the companies from most attractive to least attractive for investment. Provide a professional rationale for your ranking. In each rationale, include the current price (if available) and a price target."
     response_text = llm_gemini(system_prompt, messages)
-    # st.write(analysis_text)
     return response_text
 
 def translate_cn(messages):
@@ -244,10 +248,7 @@ if __name__ == "__main__":
 
     if st.button("Analyze") and industry:
         years = 1 # int(input("Enter the number of years for analysis: "))
-
-
         # Generate ticker ideas for the industry
         tickers = generate_ticker_ideas(industry)
         st.write(f"\n 5 Ticker Ideas for {industry} Industry:     "+ ", ".join(tickers))
-
         rank_byLLM(industry, tickers)
